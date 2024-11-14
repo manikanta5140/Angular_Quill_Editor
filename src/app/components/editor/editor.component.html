@@ -1,0 +1,31 @@
+<!-- <div class="editor-container">
+    <quill-editor
+     [(ngModel)]="editorContent"
+     [modules]="modules"
+     placeholder="write your message..."
+     spellcheck="false"
+    ></quill-editor>
+</div> -->
+
+
+<div class="editor-container">
+    <quill-editor
+      #editor
+      spellcheck="false"
+      [(ngModel)]="editorContent"
+      [modules]="{ spellChecker: { container: '#counter', unit: 'word'} }"
+      placeholder="Write your content..."
+    >
+    </quill-editor>
+  
+    
+      <span class="ql-formats">
+        <div id="counter"></div>
+      </span>
+    
+  </div>
+
+  <h3>{{editorContent}}</h3>
+  
+  
+
