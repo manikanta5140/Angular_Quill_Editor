@@ -1,13 +1,2 @@
-/* 
-.misspelled-word {
-    text-decoration: underline;
-    text-decoration-color: red;
-    text-decoration-style: wavy;
-  }
-   */
 
-   .ql-editor span.misspelled {
-    text-decoration: underline;
-    text-decoration-color: red;
-  }
   

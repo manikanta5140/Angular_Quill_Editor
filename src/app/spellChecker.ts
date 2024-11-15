@@ -1,100 +1,138 @@
 // import Quill from "quill";
-// import Typo from 'typo-js';
+// import Typo from "typo-js";
+
 // export default class SpellChecker {
-//   quill: any;
+//   quill: Quill;
 //   options: any;
 //   private dictionary: any;
-//   private isUpdating = false;
-  
+
 //   constructor(quill: Quill, options: any) {
 //     this.quill = quill;
 //     this.options = options;
-//     this.dictionary = new Typo('en_US', false, false, { dictionaryPath: '/assets/dictionaries' });
+//     this.dictionary = new Typo("en_US", false, false, { dictionaryPath: "/assets/dictionaries" });
 
-//     const container = document.querySelector(this.options.container);
-
-//     this.quill.on('editor-change', () => {
-//       if (!this.isUpdating) { 
-//         this.spellCheck();
-//         const length = this.calculate();
-//         container!.innerHTML = `<span style="color: blue; font-weight: bold;">${length} ${this.options.unit}s</span>`;
-//       }
-//     });
+//     // Debounced spell-check on text change
+//     const debouncedSpellCheck = this.debounce(() => {
+//       this.spellCheck();
+//       this.updateContainer();
+//     }, 400);
+//     this.quill.on("text-change", debouncedSpellCheck);
 //   }
 
-//   calculate() {
+//   private debounce(func: Function, delay: number) {
+//     let timer: any;
+//     return (...args: any[]) => {
+//       clearTimeout(timer);
+//       timer = setTimeout(() => func(...args), delay);
+//     };
+//   }
+
+//   private calculate() {
 //     const text = this.quill.getText().trim();
-//     return this.options.unit === 'word' ? (text ? text.split(/\s+/).length : 0) : text.length;
+//     return this.options.unit === "word" ? (text ? text.split(/\s+/).length : 0) : text.length;
 //   }
 
 //   spellCheck() {
 //     const text = this.quill.getText().trim();
 //     if (!text) return;
-  
-//     this.quill.formatText(0, text.length, { underline: false, color: null });
-  
+
+//     this.resetFormatting();
+
 //     const words = text.split(" ");
 //     let position = 0;
-  
-//     this.isUpdating = true;
-  
-//     words.forEach((word: string | any[]) => {
-//       const wordLength = word.length;
-//       const isCorrect = this.dictionary.check(word);
-//       if(!isCorrect){
-//       this.quill.formatText(position, wordLength, { underline: true, color: 'red' });
+
+//     words.forEach((word: string) => {
+//       const match = word.match(/^(\w+)([.,!?:;]*)$/);
+//       if (match) {
+//         const [fullWord, cleanWord, punctuation] = match;
+
+//         if (!this.dictionary.check(cleanWord)) {
+//           this.underlineWord(position, cleanWord.length);
+//         }
+
+//         position += fullWord.length + 1;
+//       } else {
+//         position += word.length + 1;
 //       }
-//       position += wordLength + 1;
 //     });
-//     this.isUpdating = false;
-  
-//    }
+//   }
+
+//   // Apply a wave underline style by wrapping the word in a span with the class
+//   private underlineWord(position: number, length: number) {
+//     const range = this.quill.getSelection();
+//     if (!range) return;
+
+//     const start = range.index + position;
+//     const end = start + length;
+
+//     // Insert a span element with the 'misspelled-wave' class around the word
+//     const text = this.quill.getText(start, end - start);
+//     const formattedText = `<span class="misspelled-wave">${text}</span>`;
+
+//     this.quill.deleteText(start, end - start); // Delete the original text
+//     this.quill.insertEmbed(start, "text", formattedText); // Insert the new text with the span
+//   }
+
+//   private resetFormatting() {
+//     const textLength = this.quill.getText().length;
+//     this.quill.formatText(0, textLength, { underline: false, color: null, "class": null });
+//   }
+
+//   private updateContainer() {
+//     const length = this.calculate();
+//     const container = document.querySelector(this.options.container);
+//     container!.innerHTML = `<span style="color: blue; font-weight: bold;">${length} ${this.options.unit}s</span>`;
+//   }
 // }
 
 
 
 import Quill from "quill";
-import Delta from "quill-delta";
-import Typo from 'typo-js';
+import Typo from "typo-js";
+
+const Inline = Quill.import("blots/inline");
+
+// class HighlightBlot extends Inline {
+//   static create(className: any) {
+//     const node = super.create();
+//     node.classList.add(className);
+//     return node;
+//   }
+
+//   static formats(node: { className: any; }) {
+//     return node.className || null;
+//   }
+// }
+
+// HighlightBlot["blotName"] = "highlight";
+// HighlightBlot["tagName"] = "span";
+
+// Quill.register(HighlightBlot);
 
 export default class SpellChecker {
-  quill: any;
+  quill: Quill;
   options: any;
   private dictionary: any;
-  private isUpdating = false;
-  private debouncedSpellCheck: Function;
-
+  
   constructor(quill: Quill, options: any) {
     this.quill = quill;
     this.options = options;
-    this.dictionary = new Typo('en_US', false, false, { dictionaryPath: '/assets/dictionaries' });
+    this.dictionary = new Typo("en_US", false, false, { dictionaryPath: "/assets/dictionaries" });
 
-    const container = document.querySelector(this.options.container);
+    const debouncedSpellCheck = this.debounce(() => this.spellCheck(), 400);
+    this.quill.on("text-change", debouncedSpellCheck);
 
-    // Initialize debounced spell check with a custom delay time from options
-    const delay = this.options.delay || 100; // default to 300ms if not provided
-    this.debouncedSpellCheck = this.debounce(this.spellCheck.bind(this), delay);
-
-    this.quill.on('editor-change', () => {
-      if (!this.isUpdating) { 
-        this.debouncedSpellCheck();
-        const length = this.calculate();
-        container!.innerHTML = `<span style="color: blue; font-weight: bold;">${length} ${this.options.unit}s</span>`;
-      }
+    this.quill.root.addEventListener("click", (event: MouseEvent) => {
+      const clickPosition = this.quill.getSelection()?.index || 0;
+      this.showSuggestionsForMisspelledWord(clickPosition, event);
     });
   }
 
-  calculate() {
-    const text = this.quill.getText().trim();
-    return this.options.unit === 'word' ? (text ? text.split(/\s+/).length : 0) : text.length;
-  }
-
-  // Custom debounce function with generic timer type
   debounce(func: Function, delay: number) {
-    let timer: any; // Use `any` type here
-    return  (...args: any[]) => {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => func.apply(this, args), delay);
+    let timer: any;
+    return (...args: any[]) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => func(...args), delay);
     };
   }
 
@@ -102,66 +140,169 @@ export default class SpellChecker {
     const text = this.quill.getText().trim();
     if (!text) return;
 
-    // Clear all underlines first
-    this.quill.formatText(0, text.length, { underline: false, color: null });
+    this.resetFormatting();
 
-    const words = text.split(/\s+/);
+    const words = text.split(/\b/);
     let position = 0;
 
-    this.isUpdating = true;
-
-    // Collect a delta to batch formatting
-    let delta = new Delta();
-
-    words.forEach((word: string) => {
-      const wordLength = word.length;
-      const isCorrect = this.dictionary.check(word);
-
-      // Only apply underline if the word is incorrect
-      if (!isCorrect) {
-        delta.retain(position).retain(wordLength, { underline: true, color: 'red' });
+    words.forEach((segment: string) => {
+      if (/^\w+$/.test(segment)) {
+        if (!this.dictionary.check(segment)) {
+          this.underlineWord(position, segment.length);
+        }
       }
-      position += wordLength + 1; // Move to the next word, accounting for space
+      position += segment.length;
+    });
+  }
+
+  underlineWord(position: number, length: number) {
+    const textLength = this.quill.getLength() - 1;
+    if (position < textLength && position + length <= textLength) {
+      this.quill.formatText(position, length, {color: "red" });
+      // this.quill.formatText(position, length, "highlight", "my-custom-class");
+
+    }
+  }
+
+  resetFormatting() {
+    const textLength = this.quill.getLength() - 1;
+    this.quill.formatText(0, textLength, {color: null });
+    // this.quill.formatText(0, textLength, "highlight", "my-custom-class");
+
+  }
+
+  showSuggestionsForMisspelledWord(position: number, event: MouseEvent) {
+    const [wordStart, wordEnd] = this.findWordBounds(position);
+    if (wordStart === -1 || wordEnd === -1) return;
+
+    const word = this.quill.getText(wordStart, wordEnd - wordStart).trim();
+
+    if (!this.dictionary.check(word)) {
+      const suggestions = this.dictionary.suggest(word);
+
+      if (suggestions.length > 0) {
+        this.showSuggestionsMenu(event, suggestions, wordStart, wordEnd);
+      }
+    }
+  }
+
+  showSuggestionsMenu(event: MouseEvent, suggestions: string[], wordStart: number, wordEnd: number) {
+    const existingMenu = document.querySelector(".suggestions-menu");
+    if (existingMenu) existingMenu.remove();
+
+    const menu = document.createElement("div");
+    menu.className = "suggestions-menu";
+    menu.style.position = "absolute";
+    menu.style.left = `${event.pageX}px`;
+    menu.style.top = `${event.pageY + 10}px`;
+    menu.style.backgroundColor = "#fff";
+    menu.style.border = "1px solid #ccc";
+    menu.style.boxShadow = "0 2px 6px rgba(0, 0, 0, 0.2)";
+    menu.style.padding = "8px";
+    menu.style.borderRadius = "4px";
+    menu.style.zIndex = "1";
+
+    suggestions.forEach((suggestion) => {
+      const item = document.createElement("div");
+      item.className = "suggestion-item";
+      item.style.padding = "4px 8px";
+      item.style.cursor = "pointer";
+      item.textContent = suggestion;
+
+      item.onclick = (e) => {
+        e.stopPropagation();
+        this.replaceWord(wordStart, wordEnd, suggestion);
+        menu.remove();
+      };
+
+      menu.appendChild(item);
     });
 
-    // Apply the accumulated delta all at once to prevent redundant renders
-    this.quill.updateContents(delta);
-    this.isUpdating = false;
+    document.body.appendChild(menu);
+
+    const removeMenu = () => {
+      menu.remove();
+      document.removeEventListener("click", removeMenu);
+    };
+    setTimeout(() => document.addEventListener("click", removeMenu), 0);
+  }
+
+  replaceWord(start: number, end: number, newWord: string) {
+    this.quill.deleteText(start, end - start);
+    this.quill.insertText(start, newWord);
+  }
+
+  findWordBounds(position: number): [number, number] {
+    const text = this.quill.getText();
+    let start = position;
+    let end = position;
+
+    while (start > 0 && /\w/.test(text[start - 1])) start--;
+    while (end < text.length && /\w/.test(text[end])) end++;
+
+    const textLength = this.quill.getLength() - 1;
+    start = Math.max(0, Math.min(start, textLength));
+    end = Math.max(0, Math.min(end, textLength));
+
+    return [start, end];
   }
 }
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // import Quill from "quill";
 // import Typo from 'typo-js';
-// import { debounce } from 'lodash'; // Consider lodash's debounce for better control
 
 // export default class SpellChecker {
-//   quill: any;
+//   quill: Quill;
 //   options: any;
 //   private dictionary: any;
-//   private isUpdating = false;
 
 //   constructor(quill: Quill, options: any) {
 //     this.quill = quill;
 //     this.options = options;
 //     this.dictionary = new Typo('en_US', false, false, { dictionaryPath: '/assets/dictionaries' });
 
-//     const container = document.querySelector(this.options.container);
-
-//     // Debounced function to reduce frequency of spell checks
-//     this.spellCheck = debounce(this.spellCheck.bind(this), 300);
-
-//     this.quill.on('editor-change', () => {
-//       if (!this.isUpdating) { 
-//         this.spellCheck();
-//         const length = this.calculate();
-//         container!.innerHTML = `<span style="color: blue; font-weight: bold;">${length} ${this.options.unit}s</span>`;
-//       }
-//     });
+//     const debouncedSpellCheck = this.debounce(() =>{
+//       this.spellCheck();
+//       this.updateContainer();
+//     }, 400);
+//     this.quill.on("text-change", debouncedSpellCheck);
 //   }
 
-//   calculate() {
+//   private debounce(func: Function, delay: number) {
+//     let timer: any;
+//     return (...args: any[]) => {
+//       clearTimeout(timer);
+//       timer = setTimeout(() => func(...args), delay);
+//     };
+//   }
+
+//   private calculate() {
 //     const text = this.quill.getText().trim();
 //     return this.options.unit === 'word' ? (text ? text.split(/\s+/).length : 0) : text.length;
 //   }
@@ -170,33 +311,39 @@ export default class SpellChecker {
 //     const text = this.quill.getText().trim();
 //     if (!text) return;
 
-//     // Remove underlines only from previously misspelled words (not the whole content)
-//     const currentFormat = this.quill.getContents().ops || [];
-//     currentFormat.forEach((op: { attributes: { underline: any; }; insert: string | any[]; }, index: any) => {
-//       if (op.attributes && op.attributes.underline) {
-//         this.quill.formatText(index, op.insert.length, { underline: false, color: null });
-//       }
-//     });
+//     this.resetFormatting();
 
-//     const words = text.split(/\s+/);
+//     const words = text.split(" ");
 //     let position = 0;
 
-//     this.isUpdating = true;
-
 //     words.forEach((word: string) => {
-//       const wordLength = word.length;
-//       if (!this.dictionary.check(word)) {
-//         this.quill.formatText(position, wordLength, { underline: true, color: 'red' });
-//       }
-//       position += wordLength + 1; // account for space
-//     });
+//       const match = word.match(/^(\w+)([.,!?:;]*)$/);
+//       if (match) {
+//         const [fullWord, cleanWord, punctuation] = match;
 
-//     this.isUpdating = false;
+//         if (!this.dictionary.check(cleanWord)) {
+//           this.underlineWord(position, cleanWord.length);
+//         }
+
+//         position += fullWord.length + 1;
+//       } else {
+//         position += word.length + 1;
+//       }
+//     });
+//   }
+
+//   private underlineWord(position: number, length: number) {
+//     this.quill.formatText(position, length, { underline: true, color: 'red' });
+//   }
+
+//   private resetFormatting() {
+//     const textLength = this.quill.getText().length;
+//     this.quill.formatText(0, textLength, { underline: false, color: null });
+//   }
+
+//   private updateContainer() {
+//     const length = this.calculate();
+//     const container = document.querySelector(this.options.container);
+//     container!.innerHTML = `<span style="color: blue; font-weight: bold;">${length} ${this.options.unit}s</span>`;
 //   }
 // }
-
-
-
-
-
-
