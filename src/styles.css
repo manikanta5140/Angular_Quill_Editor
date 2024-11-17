@@ -52,3 +52,10 @@
   background-color: yellow;
   font-weight: bold;
 }
+
+
+.error-underline {
+  text-decoration: underline;
+  text-decoration-color: red;
+  text-decoration-style: wavy;
+}

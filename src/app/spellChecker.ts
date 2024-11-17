@@ -85,93 +85,105 @@
 //   }
 // }
 
+import Quill from 'quill';
+import Typo from 'typo-js';
 
+const Inline = Quill.import('blots/inline');
 
-import Quill from "quill";
-import Typo from "typo-js";
+class ErrorBlot extends Inline {
+  static create(className: string): HTMLElement {
+    const node = super.create();
+    node.classList.add(className);
+    return node;
+  }
 
-const Inline = Quill.import("blots/inline");
+  static formats(node: HTMLElement): string | null {
+    return node.className || null;
+  }
+}
 
-// class HighlightBlot extends Inline {
-//   static create(className: any) {
-//     const node = super.create();
-//     node.classList.add(className);
-//     return node;
-//   }
+ErrorBlot['blotName'] = 'misspelled';
+ErrorBlot['tagName'] = 'span';
 
-//   static formats(node: { className: any; }) {
-//     return node.className || null;
-//   }
-// }
-
-// HighlightBlot["blotName"] = "highlight";
-// HighlightBlot["tagName"] = "span";
-
-// Quill.register(HighlightBlot);
+Quill.register(ErrorBlot);
 
 export default class SpellChecker {
   quill: Quill;
   options: any;
   private dictionary: any;
-  
+
   constructor(quill: Quill, options: any) {
     this.quill = quill;
     this.options = options;
-    this.dictionary = new Typo("en_US", false, false, { dictionaryPath: "/assets/dictionaries" });
+    this.dictionary = new Typo('en_US', false, false, {
+      dictionaryPath: '/assets/dictionaries',
+    });
 
-    const debouncedSpellCheck = this.debounce(() => this.spellCheck(), 400);
-    this.quill.on("text-change", debouncedSpellCheck);
+    const debouncedSpellCheck = this.debounce(() => this.spellCheck(), 1000);
+    this.quill.on('text-change', debouncedSpellCheck);
 
-    this.quill.root.addEventListener("click", (event: MouseEvent) => {
+    this.quill.root.addEventListener('click', (event: MouseEvent) => {
       const clickPosition = this.quill.getSelection()?.index || 0;
       this.showSuggestionsForMisspelledWord(clickPosition, event);
     });
   }
 
   debounce(func: Function, delay: number) {
-    let timer: any;
+    let timer: number | undefined;
     return (...args: any[]) => {
       clearTimeout(timer);
-      timer = setTimeout(() => func(...args), delay);
+      timer = window.setTimeout(() => func(...args), delay);
     };
   }
 
-  spellCheck() {
+  spellCheck(): void {
     const text = this.quill.getText().trim();
     if (!text) return;
-
+  
+    // Clear existing highlights
     this.resetFormatting();
-
-    const words = text.split(/\b/);
+  
+    // Process the text into words and their positions
     let position = 0;
-
-    words.forEach((segment: string) => {
+    const words = text.split(/(\s+)/); // Include spaces to retain proper positions
+  
+    words.forEach((segment) => {
       if (/^\w+$/.test(segment)) {
+        // Check each word and highlight if misspelled
         if (!this.dictionary.check(segment)) {
           this.underlineWord(position, segment.length);
         }
       }
-      position += segment.length;
+      position += segment.length; // Increment position by word length
     });
   }
+  
 
-  underlineWord(position: number, length: number) {
+  // underlineWord(position: number, length: number): void {
+  //   const textLength = this.quill.getLength() - 1;
+  //   if (position < textLength && position + length <= textLength) {
+  //     this.quill.formatText(position, length, 'misspelled', 'error-underline');
+  //   }
+  // }
+
+  underlineWord(position: number, length: number): void {
     const textLength = this.quill.getLength() - 1;
     if (position < textLength && position + length <= textLength) {
-      this.quill.formatText(position, length, {color: "red" });
-      // this.quill.formatText(position, length, "highlight", "my-custom-class");
-
+  
+      // Apply the misspelled formatting
+      this.quill.formatText(position, length, "misspelled", "error-underline");
     }
   }
+  
 
-  resetFormatting() {
+  resetFormatting(): void {
     const textLength = this.quill.getLength() - 1;
-    this.quill.formatText(0, textLength, {color: null });
+    // this.quill.formatText(0, textLength);
+    this.quill.formatText(0, textLength, "misspelled", false);
     // this.quill.formatText(0, textLength, "highlight", "my-custom-class");
-
   }
 
-  showSuggestionsForMisspelledWord(position: number, event: MouseEvent) {
+  showSuggestionsForMisspelledWord(position: number, event: MouseEvent): void {
     const [wordStart, wordEnd] = this.findWordBounds(position);
     if (wordStart === -1 || wordEnd === -1) return;
 
@@ -186,27 +198,32 @@ export default class SpellChecker {
     }
   }
 
-  showSuggestionsMenu(event: MouseEvent, suggestions: string[], wordStart: number, wordEnd: number) {
-    const existingMenu = document.querySelector(".suggestions-menu");
+  showSuggestionsMenu(
+    event: MouseEvent,
+    suggestions: string[],
+    wordStart: number,
+    wordEnd: number
+  ): void {
+    const existingMenu = document.querySelector('.suggestions-menu');
     if (existingMenu) existingMenu.remove();
 
-    const menu = document.createElement("div");
-    menu.className = "suggestions-menu";
-    menu.style.position = "absolute";
+    const menu = document.createElement('div');
+    menu.className = 'suggestions-menu';
+    menu.style.position = 'absolute';
     menu.style.left = `${event.pageX}px`;
     menu.style.top = `${event.pageY + 10}px`;
-    menu.style.backgroundColor = "#fff";
-    menu.style.border = "1px solid #ccc";
-    menu.style.boxShadow = "0 2px 6px rgba(0, 0, 0, 0.2)";
-    menu.style.padding = "8px";
-    menu.style.borderRadius = "4px";
-    menu.style.zIndex = "1";
+    menu.style.backgroundColor = '#fff';
+    menu.style.border = '1px solid #ccc';
+    menu.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
+    menu.style.padding = '8px';
+    menu.style.borderRadius = '4px';
+    menu.style.zIndex = '1';
 
     suggestions.forEach((suggestion) => {
-      const item = document.createElement("div");
-      item.className = "suggestion-item";
-      item.style.padding = "4px 8px";
-      item.style.cursor = "pointer";
+      const item = document.createElement('div');
+      item.className = 'suggestion-item';
+      item.style.padding = '4px 8px';
+      item.style.cursor = 'pointer';
       item.textContent = suggestion;
 
       item.onclick = (e) => {
@@ -222,12 +239,12 @@ export default class SpellChecker {
 
     const removeMenu = () => {
       menu.remove();
-      document.removeEventListener("click", removeMenu);
+      document.removeEventListener('click', removeMenu);
     };
-    setTimeout(() => document.addEventListener("click", removeMenu), 0);
+    setTimeout(() => document.addEventListener('click', removeMenu), 0);
   }
 
-  replaceWord(start: number, end: number, newWord: string) {
+  replaceWord(start: number, end: number, newWord: string): void {
     this.quill.deleteText(start, end - start);
     this.quill.insertText(start, newWord);
   }
@@ -247,30 +264,6 @@ export default class SpellChecker {
     return [start, end];
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
